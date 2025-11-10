@@ -1,0 +1,109 @@
+Готовый системный промпт для агента-разработчика (Cursor). Короткий, по делу, полностью на русском. Копируй как есть.
+
+⸻
+
+Контекст проекта (BANT/MED2IC3 Assistant) (deal-qual-assistant)
+
+*У нашего внутреннего заказчика методика авторская, с дополнительной C в конце (компонент Compelling Event), поэтому она не MEDDICC, а MED2IC3 
+
+Бэкенд + демо-UI ассистента продаж. События (CRM/почта/сообщения менеджера) → LLM-Extract извлекает факты → детерминированный пересчёт (resolve, completeness, gates, score, статус GO/HOLD/NO-GO, новизна) → формируем Question (если нужно) и Next Step → отдаём компактную read-model в UI (SSE или polling).
+
+Стек: FastAPI, SQLAlchemy 2.0 (Postgres), Pydantic v2, Jinja (промпты), Streamlit UI, SSE.
+Глобальные лимиты читаемости: файл ≤ 150 строк, функция ≤ 50 строк, ширина строки ≤ 100 символов. Микро-модули: один файл — одна тема.
+
+⸻
+
+Архитектурные правила (обязательно применять)
+
+1) Command per Use Case
+
+Как: каждый сценарий отдельным файлом/классом: ingest_event, recompute, decide_question, run_reasoner, run_arbiter. Роуты тонкие — только создают и вызывают хэндлер.
+Боль → Решение: общая обвязка (лог/метрики/транзакции) размазывается → оборачивай хэндлеры в @with_tx, @with_metrics или используй минимальный UnitOfWork (одна сессия/commit на юзкейс).
+
+2) Step pipeline (для пересчёта)
+
+Как: разбить пересчёт на шаги: resolve → completeness → gates → novelty → assemble_read_model. Шаги статичные, без I/O.
+Боль → Решение: ломкий dict-контекст и порядок шагов → типизированный контекст (Pydantic-модель) + model_validate на вход/выход шага; на границах — assert обязательных ключей.
+
+3) Отдельные порты LLM (Extractor / Reasoner / Arbiter)
+
+Как: три тонких Protocol-порта; адаптеры: GigaChatAdapter, LocalHFAdapter. Рендер промптов — вне адаптеров (см. Prompt Renderer).
+Боль → Решение: дублируются ретраи/таймауты → базовый адаптер с общим _post() (retries/timeout/tracing); сами порты остаются минимальными.
+
+4) FSM (state-machine) для вопросов менеджеру
+
+Как: таблица переходов: ask → simplify → yesno → stop; сигналы: no_novelty, stabilized, rate_limited, go.
+Боль → Решение: «тихие» промахи переходов → обязателен fallback-переход + WARN-лог для неизвестной пары; юнит-тест покрывает все (state, signal).
+
+5) Репозиторий на каждый тип данных (SQLAlchemy)
+
+Как: EventRepo, FactRepo, ReadModelRepo. Использовать в use cases; Session внутрь домена не передавать.
+Боль (N+1) → Решение: не делать запросы в циклах; применять joinedload/selectinload или выделить комбинированный запрос DealQuery.full_state(deal_id) (всё за один round trip).
+Боль (полукоммит) → Решение: одна транзакция на юзкейс (with session.begin(): …) или UnitOfWork с репозиториями на одной сессии.
+
+6) DTO/Mapper слой
+
+Как: доменные сущности — dataclass (по возможности frozen=True — неизменяемые: попытка изменить поле вызывает ошибку). Тонкие мапперы ORM↔dataclass (10–15 строк: конвертировать Decimal→float, нормализовать TZ). DTO для API — Pydantic v2 с model_config = ConfigDict(from_attributes=True); это позволяет валидировать/серилизовать как ORM-объекты, так и dataclass.
+Боль → Решение: «потеря поля» при изменении схемы → держать мапперы короткими и добавить простой тест «ORM→dataclass→ORM» на ключевые поля.
+
+7) Prompt Renderer (Jinja)
+
+Как: шаблоны в prompts/{extract|reasoner|arbiter}/{system.jinja,user.jinja} + рядом schema.*.json (JSON-контракты). Мини-класс PromptRenderer.render(kind, **ctx) возвращает {system, user}.
+Боль → Решение: ошибки видны только в рантайме → snapshot-тесты рендера; в рантайме проверять наличие ключей контекста перед рендером.
+
+8) Plugin Registry (BANT & MEDDICC)
+
+Как: YAML-конфиги фреймворков (letters, facets, weights, gates, bant→meddicc map) загружаются через реестр; политики читают пороги из YAML (единый источник правды).
+Боль → Решение: рассинхрон кода и YAML → валидировать YAML Pydantic-схемой при старте; код политики — только интерпретатор конфига.
+
+9) Микро-модули + ограничения размеров
+
+Как: если файл приближается к 120–150 строкам — дели (например, pipelines/steps/* — по одному шагу; по одному репозиторию на файл).
+Боль → Решение: автоматическая проверка длины файла/строки/функции в pre-commit (файл ≤150, строка ≤100, функция ≤50).
+
+⸻
+
+Доменные правила и read-model
+	•	Domain = чистые функции над dataclass-сущностями (без БД/LLM):
+resolve_conflicts(List[Fact]) → Resolved,
+calc_completeness(Resolved, framework_cfg) → Dict[letter, float],
+apply_gates(completeness, framework_cfg) → Status.
+	•	Read-model = агрегированный JSON для UI (не ORM): компактные поля по буквам, score/status, gates_report, question?, next_step. Формируется последним шагом пайплайна и сохраняется через ReadModelRepo.
+
+⸻
+
+Правила комментариев и докстрингов (RU)
+	•	Язык: все комментарии и докстринги — на русском. Доменные термины (BANT/MEDDICC, completeness, gates, Arbiter, read-model) — латиницей/капсом.
+	•	Где обязательны докстринги: domain/*, domain/policies/*, application/use_cases/*, ports/*, pipelines/steps/*, schemas/* (неоднозначные поля).
+	•	Опционально/кратко: adapters/*, tests/*.
+	•	Содержание докстринга: назначение (1 фраза), вход/выход, инварианты/ограничения («детерминированно», «без I/O», «в транзакции»), краевые случаи (если есть).
+	•	Стиль/объём: однострочник, если влезает; иначе 3–6 строк. Комментарии в коде — только почему/зачем, не пересказывать строки.
+	•	Автоматизация: линтеры (ruff/pydocstyle) — на публичные сущности; pre-commit — проверка длины файла/строки/функции. Подробности — в README/docs, в коде — короткая ссылка.
+
+⸻
+
+Корректность и производительность
+	•	Избегать N+1: не делать запросов в циклах; использовать joinedload/selectinload или отдельный комбинированный запрос (DealQuery.full_state).
+	•	Одна транзакция на юзкейс (факты и read-model обновляются атомарно).
+	•	Приводить типы один раз в мапперах (например, Decimal→float, TZ-aware datetimes).
+	•	Pydantic v2: на краях API использовать model_validate(obj, from_attributes=True).
+	•	FSM: иметь fallback-переход + WARN-лог на неизвестные пары.
+	•	Промпты: render → вызов LLM-порта → валидация по JSON-схеме → парсинг DTO.
+
+⸻
+
+Этап 1 (ВЫПОЛНЕН УСПЕШНО) — Каркас и инфраструктура (без БД/LLM)
+
+Промпт для Cursor:
+Используй preprompt.txt как системный контекст.
+Создай минимальный каркас (слоистая архитектура, микро-модули).
+Сделай:
+	1.	backend (FastAPI): GET /health, GET /state/{deal_id} (читает из in-memory заглушки), POST /events (кладёт событие в in-memory).
+	2.	ui (Streamlit): поле Deal ID, кнопка Refresh, показывает JSON state.
+	3.	Docker: docker-compose.yml для postgres, backend, ui; подключи .env.
+	4.	Pre-commit: ruff/black/mypy + scripts/check_lengths.py (файл ≤150, функция ≤50, строка ≤100).
+Комментарии/докстринги — на русском.
+
+Критерии приёмки
+	•	pytest -q проходит test_health.py (200 OK).
+	•	docker compose up --build; UI открывается; GET /health → {ok:true}; GET /state/x → пустая заготовка.

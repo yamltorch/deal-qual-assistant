@@ -1,0 +1,2 @@
+# Реализация ReadModelRepo на PostgreSQL
+

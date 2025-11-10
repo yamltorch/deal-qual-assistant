@@ -1,0 +1,2 @@
+# Реализация SnapshotRepo на PostgreSQL
+

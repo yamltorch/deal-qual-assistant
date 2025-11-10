@@ -1,0 +1,49 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: dq-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-deal}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-deal}
+      POSTGRES_DB: ${POSTGRES_DB:-deal_qual}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  backend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend
+    container_name: dq-backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      BACKEND_PORT: ${BACKEND_PORT:-8000}
+    depends_on:
+      - postgres
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+
+  ui:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.ui
+    container_name: dq-ui
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      BACKEND_URL: ${BACKEND_URL:-http://backend:8000}
+    depends_on:
+      - backend
+    ports:
+      - "${UI_PORT:-8501}:8501"
+
+volumes:
+  postgres_data:
+
