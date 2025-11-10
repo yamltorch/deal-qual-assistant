@@ -27,4 +27,10 @@ class InMemoryReadModelRepository(ReadModelRepository):
         with self._lock:
             self._storage[model.deal_id] = model
 
+    def delete(self, deal_id: str) -> None:
+        """Удалить read-model сделки."""
+
+        with self._lock:
+            self._storage.pop(deal_id, None)
+
 

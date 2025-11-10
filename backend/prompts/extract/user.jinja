@@ -1,2 +1,22 @@
-# Пользовательский промпт для извлечения фактов (шаблон Jinja2)
+# Пользовательский промпт для извлечения фактов (extract)
 
+Framework: {{ framework }}
+
+CRM:
+{{ crm | tojson(indent=2) }}
+
+Chat:
+{% if chat_list %}
+{% for turn in chat_list %}
+- {{ turn.role }}: {{ turn.text }}
+{% endfor %}
+{% elif chat_map %}
+{% for who, text in chat_map.items() %}
+- {{ who }}: {{ text }}
+{% endfor %}
+{% else %}
+- (данных нет)
+{% endif %}
+
+Free-text event:
+{{ free_text or "" }}

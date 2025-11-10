@@ -1,2 +1,58 @@
-# Пользовательский промпт для Reasoner (шаблон Jinja2)
+# Пользовательский промпт для Reasoner (analysis)
 
+Framework: {{ framework }}
+
+Deal:
+- id: {{ deal.id }}
+- name: {{ deal.name }}
+- stage: {{ deal.stage }}
+- updated_at: {{ deal.updated_at }}
+
+Decision snapshot:
+- status: {{ decision.status }}
+- score: {{ "%.3f" | format(decision.score) }}
+- reason: {{ decision.reason }}
+
+Completeness:
+{% for letter, value in completeness.per_letter | dictsort %}
+- {{ letter }}: {{ "%.3f" | format(value) }} (yes={{ completeness.yes_counts[letter] }})
+{% endfor %}
+
+Facts by letter:
+{% for letter in letters %}
+Letter {{ letter.key }} — {{ letter.title }}:
+{% set entries = facts_by_letter.get(letter.key, []) %}
+{% if entries %}
+{% for fact in entries %}
+- facet: {{ fact.facet }}
+  value: {{ fact.value | tojson }}
+  source: {{ fact.source }}
+  evidence: {{ fact.evidence }}
+  confidence: {{ "%.2f" | format(fact.confidence) }}
+  ts: {{ fact.ts }}
+{% endfor %}
+{% else %}
+- (нет подтверждённых фактов)
+{% endif %}
+{% endfor %}
+
+CRM snapshot:
+{{ crm | tojson(indent=2) }}
+
+Chat history:
+{% if chat_list %}
+{% for turn in chat_list %}
+- {{ turn.role }}: {{ turn.text }}
+{% endfor %}
+{% elif chat_map %}
+{% for who, text in chat_map.items() %}
+- {{ who }}: {{ text }}
+{% endfor %}
+{% else %}
+- (данных нет)
+{% endif %}
+
+Free-text event:
+{{ free_text or "" }}
+
+Allow manager question: {{ allow_manager_question | lower }}

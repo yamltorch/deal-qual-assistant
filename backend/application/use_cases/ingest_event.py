@@ -7,7 +7,7 @@ from typing import Any, Mapping
 
 from backend.domain.entities import DealReadModel, Event
 from backend.ports.clock import ClockPort
-from backend.ports.repositories import EventRepository, ReadModelRepository
+from backend.ports.unit_of_work import UnitOfWorkFactory
 
 
 @dataclass(frozen=True, slots=True)
@@ -24,12 +24,10 @@ class IngestEventHandler:
 
     def __init__(
         self,
-        event_repo: EventRepository,
-        read_model_repo: ReadModelRepository,
+        uow_factory: UnitOfWorkFactory,
         clock: ClockPort,
     ) -> None:
-        self._event_repo = event_repo
-        self._read_model_repo = read_model_repo
+        self._uow_factory = uow_factory
         self._clock = clock
 
     def execute(self, command: IngestEventCommand) -> DealReadModel:
@@ -41,12 +39,14 @@ class IngestEventHandler:
             payload=dict(command.payload),
             created_at=self._clock.utcnow(),
         )
-        self._event_repo.add(event)
-        current = self._read_model_repo.get(command.deal_id) or DealReadModel.empty(
-            deal_id=command.deal_id,
-        )
-        updated = current.with_event(event)
-        self._read_model_repo.save(updated)
-        return updated
+        with self._uow_factory() as uow:
+            uow.events.add(event)
+            current = uow.read_models.get(command.deal_id) or DealReadModel.empty(
+                deal_id=command.deal_id,
+            )
+            updated = current.with_event(event)
+            uow.read_models.save(updated)
+            uow.commit()
+            return updated
 
 

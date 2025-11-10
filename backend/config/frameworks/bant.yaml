@@ -1,2 +1,58 @@
-# Конфигурация фреймворка BANT: буквы, фасеты, веса, гейты
-
+name: BANT
+priority: 20
+letters:
+  - key: B
+    title: Budget
+    fact_kind: bant.B
+    weight: 0.25
+    checklist:
+      - budget_size_known
+      - budget_owner_identified
+      - budget_confirmed
+      - procurement_process_known
+      - financial_approval_timeline
+  - key: A
+    title: Authority
+    fact_kind: bant.A
+    weight: 0.25
+    checklist:
+      - authority_map_known
+      - decision_maker_engaged
+      - champion_identified
+      - approval_chain_clear
+      - legal_contact_known
+  - key: N
+    title: Need
+    fact_kind: bant.N
+    weight: 0.25
+    checklist:
+      - pain_points_validated
+      - value_hypothesis_approved
+      - success_metrics_agreed
+      - alternative_solutions_compared
+      - internal_priority_confirmed
+  - key: T
+    title: Timing
+    fact_kind: bant.T
+    weight: 0.25
+    checklist:
+      - target_go_live_set
+      - buying_window_confirmed
+      - mutual_plan_defined
+      - risks_acknowledged
+      - key_milestones_planned
+gates:
+  - status: go
+    min_score: 0.75
+    required_letters:
+      B: 0.5
+      A: 0.5
+      N: 0.5
+      T: 0.5
+  - status: hold
+    min_score: 0.5
+    required_letters:
+      B: 0.5
+      A: 0.5
+  - status: no-go
+    min_score: 0.0

@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from backend.domain.entities import DealReadModel
-from backend.ports.repositories import ReadModelRepository
+from backend.ports.unit_of_work import UnitOfWorkFactory
 
 
 @dataclass(frozen=True, slots=True)
@@ -18,14 +18,14 @@ class GetDealStateQuery:
 class GetDealStateHandler:
     """Возвращает сохранённое или пустое состояние сделки."""
 
-    def __init__(self, read_model_repo: ReadModelRepository) -> None:
-        self._read_model_repo = read_model_repo
+    def __init__(self, uow_factory: UnitOfWorkFactory) -> None:
+        self._uow_factory = uow_factory
 
     def execute(self, query: GetDealStateQuery) -> DealReadModel:
         """Получить read-model, включая пустую заготовку."""
 
-        return self._read_model_repo.get(query.deal_id) or DealReadModel.empty(
-            deal_id=query.deal_id,
-        )
+        with self._uow_factory() as uow:
+            model = uow.read_models.get(query.deal_id)
+        return model or DealReadModel.empty(deal_id=query.deal_id)
 
 

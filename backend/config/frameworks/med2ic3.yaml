@@ -1,0 +1,104 @@
+name: MED2IC3
+priority: 10
+letters:
+  - key: M
+    title: Metrics
+    fact_kind: med2ic3.M
+    weight: 0.125
+    checklist:
+      - metrics_defined
+      - baseline_understood
+      - roi_model_built
+      - leadership_targets_mapped
+      - measurement_plan_signed
+  - key: E
+    title: Economic Buyer
+    fact_kind: med2ic3.E
+    weight: 0.125
+    checklist:
+      - economic_buyer_identified
+      - budget_authority_confirmed
+      - buyer_meeting_completed
+      - political_map_understood
+      - personal_win_articulated
+  - key: D1
+    title: Decision Criteria
+    fact_kind: med2ic3.D1
+    weight: 0.125
+    checklist:
+      - solution_criteria_listed
+      - must_have_validated
+      - comparison_framework_aligned
+      - differentiation_documented
+      - evaluation_scorecard_shared
+  - key: D2
+    title: Decision Process
+    fact_kind: med2ic3.D2
+    weight: 0.125
+    checklist:
+      - process_steps_known
+      - stakeholders_timed
+      - procurement_entry_defined
+      - legal_review_planned
+      - signoff_sequence_approved
+  - key: I
+    title: Identify Pain
+    fact_kind: med2ic3.I
+    weight: 0.125
+    checklist:
+      - business_pain_quantified
+      - owner_agrees_on_pain
+      - urgency_acknowledged
+      - impact_story_validated
+      - negative_outcome_defined
+  - key: C1
+    title: Champion
+    fact_kind: med2ic3.C1
+    weight: 0.125
+    checklist:
+      - champion_named
+      - champion_has_power
+      - champion_coaching_pipeline
+      - champion_runs_internals
+      - champion_access_to_buyer
+  - key: C2
+    title: Competition
+    fact_kind: med2ic3.C2
+    weight: 0.125
+    checklist:
+      - competitors_listed
+      - strengths_weaknesses_known
+      - displacement_strategy_ready
+      - anti_champion_identified
+      - win_plan_socialized
+  - key: C3
+    title: Compelling Event
+    fact_kind: med2ic3.C3
+    weight: 0.125
+    checklist:
+      - deadline_documented
+      - trigger_confirmed
+      - consequence_defined
+      - sponsor_committed
+      - executive_visibility
+gates:
+  - status: go
+    min_score: 0.8
+    required_letters:
+      M: 1.0
+      E: 0.5
+      D1: 0.5
+      D2: 0.5
+      I: 0.5
+      C1: 0.5
+      C3: 0.5
+  - status: hold
+    min_score: 0.6
+    required_letters:
+      M: 0.5
+      E: 0.5
+      D1: 0.5
+      I: 0.5
+  - status: no-go
+    min_score: 0.0
+

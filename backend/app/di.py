@@ -4,30 +4,45 @@ from __future__ import annotations
 
 from functools import lru_cache
 
-from backend.adapters.persistence.in_memory_event_repo import InMemoryEventRepository
-from backend.adapters.persistence.in_memory_read_model_repo import (
-    InMemoryReadModelRepository,
-)
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+
 from backend.adapters.time.system_clock import SystemClock
+from backend.adapters.persistence.orm_models import Base
+from backend.adapters.persistence.unit_of_work import SqlAlchemyUnitOfWork
 from backend.application.use_cases import (
     GetDealStateHandler,
     IngestEventHandler,
 )
+from backend.config.settings import get_settings
+from backend.ports.unit_of_work import UnitOfWorkFactory
 
 
 class AppContainer:
     """Хранит singleton-объекты приложения без сложной инфраструктуры."""
 
     def __init__(self) -> None:
-        self._event_repo = InMemoryEventRepository()
-        self._read_model_repo = InMemoryReadModelRepository()
+        settings = get_settings()
+        engine = create_engine(
+            settings.database_url,
+            echo=False,
+            future=True,
+            pool_pre_ping=True,
+        )
+        if settings.create_schema:
+            Base.metadata.create_all(engine)
+        session_factory = sessionmaker(
+            bind=engine,
+            autoflush=False,
+            expire_on_commit=False,
+        )
+        self._uow_factory: UnitOfWorkFactory = lambda: SqlAlchemyUnitOfWork(session_factory)
         self._clock = SystemClock()
         self._ingest_event = IngestEventHandler(
-            event_repo=self._event_repo,
-            read_model_repo=self._read_model_repo,
+            uow_factory=self._uow_factory,
             clock=self._clock,
         )
-        self._get_state = GetDealStateHandler(read_model_repo=self._read_model_repo)
+        self._get_state = GetDealStateHandler(uow_factory=self._uow_factory)
 
     @property
     def ingest_event(self) -> IngestEventHandler:

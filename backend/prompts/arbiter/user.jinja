@@ -1,2 +1,47 @@
-# Пользовательский промпт для Arbiter (шаблон Jinja2)
+# Пользовательский промпт для Arbiter (conflict resolution)
 
+Framework: {{ framework }}
+
+Facet: {{ facet.name }}
+Letter: {{ facet.letter }}
+Conflict reason: {{ conflict_reason }}
+
+Текущий выбранный факт:
+{% if current_fact %}
+- id: {{ current_fact.id }}
+  value: {{ current_fact.value | tojson }}
+  source: {{ current_fact.source }}
+  confidence: {{ "%.2f" | format(current_fact.confidence) }}
+  ts: {{ current_fact.ts }}
+{% else %}
+- (нет выбранного факта)
+{% endif %}
+
+Кандидаты:
+{% for candidate in candidates %}
+- id: {{ candidate.id }}
+  value: {{ candidate.value | tojson }}
+  source: {{ candidate.source }}
+  confidence: {{ "%.2f" | format(candidate.confidence) }}
+  evidence: {{ candidate.evidence }}
+  ts: {{ candidate.ts }}
+{% endfor %}
+
+CRM snapshot:
+{{ crm | tojson(indent=2) }}
+
+Chat history:
+{% if chat_list %}
+{% for turn in chat_list %}
+- {{ turn.role }}: {{ turn.text }}
+{% endfor %}
+{% elif chat_map %}
+{% for who, text in chat_map.items() %}
+- {{ who }}: {{ text }}
+{% endfor %}
+{% else %}
+- (данных нет)
+{% endif %}
+
+Free-text event:
+{{ free_text or "" }}

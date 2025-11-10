@@ -29,4 +29,10 @@ class InMemoryEventRepository(EventRepository):
         with self._lock:
             return list(self._storage.get(deal_id, []))
 
+    def delete_for_deal(self, deal_id: str) -> None:
+        """Удалить все события указанной сделки."""
+
+        with self._lock:
+            self._storage.pop(deal_id, None)
+
 

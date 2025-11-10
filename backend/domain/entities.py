@@ -18,6 +18,18 @@ class Event:
 
 
 @dataclass(frozen=True, slots=True)
+class Fact:
+    """Структурированный факт о сделке, полученный из пайплайна Extract."""
+
+    deal_id: str
+    kind: str
+    payload: Mapping[str, Any]
+    confidence: float | None
+    observed_at: datetime
+    source: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class DealReadModel:
     """Компактное представление состояния сделки для отдачи во внешние слои."""
 

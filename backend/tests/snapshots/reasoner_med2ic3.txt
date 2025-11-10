@@ -1,3 +1,4 @@
+=== REASONER :: SYSTEM ===
 Готовый системный промпт для агента-разработчика (Cursor). Короткий, по делу, полностью на русском. Копируй как есть.
 
 ⸻
@@ -141,3 +142,150 @@ Use case recompute: читает факты, применяет правила, 
 Критерии приёмки
  • Тесты на completeness/gates (BANT и MED2IC3) с дискретизацией по чек-листам.   
  • Ручная проверка: 3–5 фактов в БД → GET /state/{deal_id} показывает completeness/статус.
+
+# Системный промпт для Reasoner (analysis)
+
+Вы — Reasoner. По фактам, CRM/переписке и статусу сделки объясните «почему так»,
+зафиксируйте риски и предложите следующий шаг. Не выдумывайте. Оперируйте только
+доступными evidence. Работайте в рамках выбранного фреймворка (BANT или MED2IC3).
+
+Формат ответа — строгий JSON-объект:
+{
+  "decision": {
+    "status": "go|hold|no-go",
+    "score": число 0..1,
+    "confidence": число 0..1,
+    "explanation": "кратко почему выбран статус"
+  },
+  "why": [
+    {
+      "letter": "B|A|N|T|M|E|D1|D2|I|C1|C2|C3",
+      "facet": "строка",
+      "status": "ok|risk|gap",
+      "signal": "ключевой тезис",
+      "evidence": "цитата",
+      "source": "crm|chat|text|facts",
+      "confidence": число 0..1
+    }
+  ],
+  "risks": [
+    {
+      "title": "строка",
+      "impact": "low|medium|high",
+      "description": "почему это риск",
+      "evidence": "цитата",
+      "mitigation": "что сделать",
+      "linked_letters": ["буквы из why"]
+    }
+  ],
+  "next_step": {
+    "summary": "что сделать дальше",
+    "owner": "manager|client|champion|other",
+    "due": "ISO-8601 дата или null",
+    "reason": "зачем",
+    "confidence": число 0..1
+  },
+  "question": {
+    "ask": true|false,
+    "text": "формулировка вопроса или null",
+    "reason": "почему нужен вопрос или null"
+  }
+}
+
+Правила:
+- Перечисляйте только реальные факты, явно связывая letter ↔ evidence.
+- Поле "source" в why: "facts" когда вы ссылаетесь на готовый факт, иначе "crm"/"chat"/"text".
+- "risks" заполняйте только при наличии evidence. Нет рисков — верните [].
+- "next_step" обязателен: конкретное действие + владелец. Даты → ISO. Нет даты → null.
+- Поле question.ask = true только если allow_manager_question == true и действительно
+  нужен запрос к менеджеру. Иначе ask=false и text/reason = null.
+- Порождайте concise-тексты (до 2 предложений в строковых полях).
+- Не добавляйте новые поля.
+
+Контекст (см. пользовательский промпт):
+- framework, decision, completeness, facts_by_letter, crm, chat, free_text,
+  allow_manager_question, сроки/score подсказки.
+- MED2IC3: уделяйте внимание C3 (Compelling Event). Фиксируйте триггеры/дедлайны.
+
+Возвращайте валидный JSON. Если данных недостаточно — объясните это в explanation/risks.
+
+=== REASONER :: USER ===
+# Пользовательский промпт для Reasoner (analysis)
+
+Framework: MED2IC3
+
+Deal:
+- id: DEAL-501
+- name: Modern Data Platform
+- stage: Решение
+- updated_at: 2025-01-18T10:00:00Z
+
+Decision snapshot:
+- status: hold
+- score: 0.700
+- reason: Не все буквы закрыты
+
+Completeness:
+- C1: 0.500 (yes=3)
+- C2: 0.500 (yes=3)
+- C3: 0.500 (yes=3)
+- D1: 0.500 (yes=3)
+- D2: 0.500 (yes=3)
+- E: 0.500 (yes=3)
+- I: 0.500 (yes=3)
+- M: 0.500 (yes=3)
+
+Facts by letter:
+Letter M — Metrics:
+- facet: metrics.expected_lift
+  value: {"delta": 0.12, "metric": "GM"}
+  source: crm
+  evidence: Ожидаемая выручка с НДС: 12500000
+  confidence: 0.90
+  ts: 2025-01-12
+Letter E — Economic Buyer:
+- (нет подтверждённых фактов)
+Letter D1 — Decision Criteria:
+- (нет подтверждённых фактов)
+Letter D2 — Decision Process:
+- (нет подтверждённых фактов)
+Letter I — Identify Pain:
+- (нет подтверждённых фактов)
+Letter C1 — Champion:
+- (нет подтверждённых фактов)
+Letter C2 — Competition:
+- (нет подтверждённых фактов)
+Letter C3 — Compelling Event:
+- facet: timeline.compelling_event
+  value: {"date": "2025-03-05", "description": "\u0424\u0438\u043d\u0430\u043d\u0441\u043e\u0432\u044b\u0439 \u0430\u0443\u0434\u0438\u0442"}
+  source: chat
+  evidence: Нужно успеть к аудиту 5 марта.
+  confidence: 0.80
+  ts: 2025-01-16
+
+CRM snapshot:
+{
+  "ID \u0441\u0434\u0435\u043b\u043a\u0438": 501,
+  "\u0414\u0430\u0442\u0430 \u043f\u0435\u0440\u0435\u0445\u043e\u0434\u0430 \u043d\u0430 \u044d\u0442\u0430\u043f": "2025-01-12",
+  "\u0414\u0430\u0442\u0430 \u0444\u0438\u043d\u0430\u043b\u044c\u043d\u043e\u0433\u043e \u0441\u043e\u0433\u043b\u0430\u0441\u043e\u0432\u0430\u043d\u0438\u044f": "2025-03-10",
+  "\u041d\u0414\u0421": "20%",
+  "\u041d\u0430\u0437\u0432\u0430\u043d\u0438\u0435 \u0441\u0434\u0435\u043b\u043a\u0438": "Modern Data Platform",
+  "\u041e\u0436\u0438\u0434\u0430\u0435\u043c\u0430\u044f \u0432\u044b\u0440\u0443\u0447\u043a\u0430 \u0431\u0435\u0437 \u041d\u0414\u0421": 10416667,
+  "\u041e\u0436\u0438\u0434\u0430\u0435\u043c\u0430\u044f \u0432\u044b\u0440\u0443\u0447\u043a\u0430 \u0441 \u041d\u0414\u0421": 12500000,
+  "\u041e\u0442\u0432\u0435\u0442\u0441\u0442\u0432\u0435\u043d\u043d\u044b\u0439": "\u0410\u043d\u043d\u0430 \u041f\u0435\u0442\u0440\u043e\u0432\u0430",
+  "\u041f\u043b\u0430\u043d\u043e\u0432\u0430\u044f \u0434\u0430\u0442\u0430 \u0437\u0430\u043f\u0443\u0441\u043a\u0430": "2025-04-01",
+  "\u0421\u0442\u0430\u0442\u0443\u0441 \u0441\u0434\u0435\u043b\u043a\u0438": "\u041e\u0442\u043a\u0440\u044b\u0442\u0430",
+  "\u0422\u0435\u043a\u0443\u0449\u0430\u044f \u043a\u043e\u043d\u043a\u0443\u0440\u0435\u043d\u0446\u0438\u044f": "\u0412\u0435\u043d\u0434\u043e\u0440 X",
+  "\u042d\u0442\u0430\u043f": "\u041f\u043e\u0434\u0433\u043e\u0442\u043e\u0432\u043a\u0430 \u0437\u0430\u043a\u0443\u043f\u043a\u0438"
+}
+
+Chat history:
+- manager: Клиент подтвердил бюджет 12.5 млн ₽.
+- client: Финансовый директор вернётся с тендера 5 февраля.
+- manager: Нужно успеть к аудиту 5 марта.
+
+Free-text event:
+Обнаружен рисковый дедлайн: аудит до 2025-03-05.
+
+Allow manager question: false
+

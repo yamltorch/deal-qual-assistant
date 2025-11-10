@@ -1,2 +1,86 @@
-# JSON-схема ответа Arbiter
-
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://inno.dev/deal-qual-assistant/schema/arbiter-response.json",
+  "title": "ArbiterResponse",
+  "description": "Контракт ответа Arbiter для разрешения конфликтующих фактов.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "facet",
+    "letter",
+    "decision",
+    "selected_id",
+    "rationale",
+    "comparisons",
+    "question"
+  ],
+  "properties": {
+    "facet": {
+      "type": "string",
+      "minLength": 1
+    },
+    "letter": {
+      "type": "string",
+      "enum": ["B", "A", "N", "T", "M", "E", "D1", "D2", "I", "C1", "C2", "C3"]
+    },
+    "decision": {
+      "type": "string",
+      "enum": ["select", "reject_all", "needs_human"]
+    },
+    "selected_id": {
+      "type": ["string", "null"]
+    },
+    "rationale": {
+      "type": "string",
+      "minLength": 1
+    },
+    "comparisons": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["candidate_id", "verdict", "reason", "evidence", "confidence"],
+        "properties": {
+          "candidate_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "verdict": {
+            "type": "string",
+            "enum": ["accept", "reject", "inconclusive"]
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          },
+          "evidence": {
+            "type": "string",
+            "minLength": 1
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0.0,
+            "maximum": 1.0
+          }
+        }
+      }
+    },
+    "question": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ask", "text", "reason"],
+      "properties": {
+        "ask": {
+          "type": "boolean"
+        },
+        "text": {
+          "type": ["string", "null"]
+        },
+        "reason": {
+          "type": ["string", "null"]
+        }
+      }
+    }
+  }
+}
